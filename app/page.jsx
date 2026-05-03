@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { AVATARS } from "@/lib/data";
+import { CodeDemo } from "@/components/demo-components-animate-code";
 
 export default function Home() {
   return (
@@ -67,6 +68,10 @@ export default function Home() {
 
           </div>
 
+        </div>
+        <div className="col-span-full lg:col-span-2 flex items-center justify-center
+        lg:justify-start mt-12 lg:mt-0 lg:rotate-3">
+          <CodeDemo duration={30000} delay={0} writing={true} cursor={true} />
         </div>
       </section>
     </div>
