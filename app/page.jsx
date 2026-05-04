@@ -4,8 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { AVATARS } from "@/lib/data";
+import { AI_TAGS, AVATARS, LOGOS } from "@/lib/data";
 import { CodeDemo } from "@/components/demo-components-animate-code";
+import { SectionHeading } from "@/components/reusables";
+import BentoCard from "@/components/bentoCard";
+import { Bot } from "lucide-react";
 
 export default function Home() {
   return (
@@ -73,6 +76,45 @@ export default function Home() {
         lg:justify-start mt-12 lg:mt-0 lg:rotate-3">
           <CodeDemo duration={30000} delay={0} writing={true} cursor={true} />
         </div>
+      </section>
+
+      <section className="relative z-10 border-y border-white/10 py-14">
+      <p className="text-center text-sm font-medium text-stone-600 tracking-widest uppercase mb-8">
+        Prept is a platform that helps you prepare for your next interview.
+      </p>
+
+      <div className="flex flex-wrap items-center justify-center gap-24 px-6">
+        {LOGOS.map((l) => (
+          <Image src={l.src} alt={l.alt} width={100} height={100} className="w-auto h-6 opacity-60 grayscale" />
+        ))}
+      
+      </div>
+      </section>
+
+      <section className="relative z-10 py-28 max-w-5xl mx-auto px-6">
+        <div className="text-center mb-16">
+          <SectionLabel>Features</SectionLabel>
+          <SectionHeading
+          gray="What makes Prept different"
+          gold="Real experts, real practice, real results"
+          />
+          </div>
+
+          <div className="grid grid-cols-12 gap-4">
+            <div className="col-span-12 lg:col-span-7">
+              <BentoCard icon={<Bot size={20} className="text-amber-400" />} title={<GrayTitle>AI-powered interview prep</GrayTitle>} desc="Get personalized practice questions and feedback from real experts.">
+                <div className="flex flex-wrap gap-2 mt-5">
+                  {AI_TAGS.map((t) => (
+                    <Badge key={t.label} variant={t.active ? "gold" : "outline"}>
+                      {t.label}
+                    </Badge>
+                  ))}
+                </div>
+              </BentoCard>
+            
+            </div>
+          </div>
+          
       </section>
     </div>
   );

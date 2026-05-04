@@ -15,7 +15,7 @@ export const CodeDemo = ({
   return (
     <Code
       key={`${duration}-${delay}-${writing}-${cursor}`}
-      className="w-[420px] h-[372px] border-white/25 bg-transparent shadow-2xl backdrop-blur-md"
+      className="w-full sm:w-110 h-120 border-none"
       code={`from collections import defaultdict
 
 def group_anagrams(words):
