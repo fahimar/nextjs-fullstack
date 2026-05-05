@@ -9,6 +9,7 @@ import { CodeDemo } from "@/components/demo-components-animate-code";
 import { SectionHeading } from "@/components/reusables";
 import BentoCard from "@/components/bentoCard";
 import { Bot } from "lucide-react";
+import { ROLES } from "@/lib/data";
 
 export default function Home() {
   return (
@@ -115,6 +116,37 @@ export default function Home() {
             </div>
           </div>
           
+      </section>
+
+      <section className="relative z-10 py-28 max-w-5xl mx-auto px-6">
+        <div className="text-center mb-16">
+             <SectionLabel>Who it&apos;s for</SectionLabel>
+             <SectionHeading
+             gray="Not just another interview prep platform"
+             gold="Real experts, real practice, real results"
+             />
+
+        </div>
+
+        <div className="grid grid-cols-12 gap-6">
+          {ROLES.map((role) => (
+              <div key={role.label}
+              className="col-span-12 md:col-span-6 relative bg-[#0f0f11] border border-white/10 hover:border-amber-400/20 rounded-2xl p-9 h-full transition duration-300 overflow-hidden">
+              
+              <span className="w-11 h-11 rounded-xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-xl mb-5">{role.icon}</span>
+
+              <h3 className='font-serif text-xl tracking-tight mb-2'>{role.title}</h3>
+
+              <p className='text-sm text-stone-400 leading-relaxed mb-8'>{role.desc}</p>
+
+              <div className="flex flex-wrap gap-2 mt-5">
+                {role.perks.map((p) => (
+                  <Badge key={p} variant="outline">{p}</Badge>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );
