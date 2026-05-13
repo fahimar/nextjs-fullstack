@@ -10,6 +10,8 @@ import { SectionHeading } from "@/components/reusables";
 import BentoCard from "@/components/bentoCard";
 import { Bot } from "lucide-react";
 import { ROLES } from "@/lib/data";
+import { CheckIcon } from "lucide-react";
+import { PricingTable } from "@clerk/nextjs";
 
 export default function Home() {
   return (
@@ -133,19 +135,73 @@ export default function Home() {
               <div key={role.label}
               className="col-span-12 md:col-span-6 relative bg-[#0f0f11] border border-white/10 hover:border-amber-400/20 rounded-2xl p-9 h-full transition duration-300 overflow-hidden">
               
-              <span className="w-11 h-11 rounded-xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-xl mb-5">{role.icon}</span>
+              <span className="inline-flex rounded-full bg-amber-400/10 border border-amber-400/20 px-4 py-1.5 text-xs font-semibold tracking-[0.14em] text-amber-300 uppercase mb-5">
+                {role.label}
+              </span>
 
               <h3 className='font-serif text-xl tracking-tight mb-2'>{role.title}</h3>
 
               <p className='text-sm text-stone-400 leading-relaxed mb-8'>{role.desc}</p>
 
-              <div className="flex flex-wrap gap-2 mt-5">
+              <ul className="space-y-3">
                 {role.perks.map((p) => (
-                  <Badge key={p} variant="outline">{p}</Badge>
+                  <li key={p} className="flex gap-3 text-sm text-stone-400">
+                    <span className="mt-0.5 min-w-4 h-4 rounded-full bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-xs text-amber-400">
+                      <CheckIcon className="size-3 text-stone-400" />
+                    </span>
+                    <span>{p}</span>
+                </li>
                 ))}
-              </div>
+              </ul>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section className="relative z-10 pb-28 max-w-5xl mx-auto px-6">
+        <div className="text-center mb-16">
+          <SectionLabel>Pricing</SectionLabel>
+          <SectionHeading
+            gray="Simple, transparent"
+            gold="credit-based plans"
+          />
+          <p className="text-stone-400 mt-3 text-sm">
+            Each credit = one session. Unused credits roll over.
+          </p>
+        </div>
+
+        <PricingTable />
+      </section>
+
+      {/* CTA */}
+      <section className="relative z-10 pb-28 max-w-5xl mx-auto px-6">
+        <div className="relative border border-amber-400/20 rounded-3xl px-3 sm:px-16 py-20 bg-linear-to-br from-amber-400/5 text-center overflow-hidden">
+          <StarsBackgroundDemo />
+
+          <h2 className="font-serif relative text-4xl md:text-5xl leading-tight tracking-tight mb-4">
+            <GrayTitle>Your next interview</GrayTitle>
+            <br />
+            <GoldTitle>starts here</GoldTitle>
+          </h2>
+
+          <p className="relative text-stone-400 font-light text-sm mb-11">
+            Join thousands of engineers already levelling up on Prept.
+          </p>
+
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <Link href="/onboarding" className="relative">
+              <Button variant="gold" size="hero">
+                Get started
+              </Button>
+            </Link>
+
+            <Link href="/explore" className="relative">
+              <Button variant="outline" size="hero">
+                Browse Interviewers →
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
     </div>

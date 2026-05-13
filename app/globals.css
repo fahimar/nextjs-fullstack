@@ -126,3 +126,7 @@
   }
 
 }
+
+.cl-internal-b8hinb {
+  grid-template-columns: auto auto auto !important;
+}
