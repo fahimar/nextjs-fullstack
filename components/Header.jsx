@@ -19,6 +19,7 @@ function Header() {
           <div className='hidden md:flex items-center gap-8 text-sm'>
             <Link href="/explore" className='text-stone-300 hover:text-amber-400 transition'>Explore</Link>
             <Link href="/dashboard" className='text-stone-300 hover:text-amber-400 transition'>Dashboard</Link>
+            <Link href="/design-review" className='text-stone-300 hover:text-amber-400 transition'>Design Review</Link>
           </div>
         </Show>
 
