@@ -14,8 +14,13 @@ function Header() {
             <Image src="/logo.png" alt="Prept Logo" width={100} height={100} className='w-auto h-11' />
         </Link>
 
-        {/* Redirection Logic */}
-
+        {/* Nav links (signed-in) */}
+        <Show when="signed-in">
+          <div className='hidden md:flex items-center gap-8 text-sm'>
+            <Link href="/explore" className='text-stone-300 hover:text-amber-400 transition'>Explore</Link>
+            <Link href="/dashboard" className='text-stone-300 hover:text-amber-400 transition'>Dashboard</Link>
+          </div>
+        </Show>
 
         {/* Sign in / Sign up */}
         <div className='flex items-center gap-3'>

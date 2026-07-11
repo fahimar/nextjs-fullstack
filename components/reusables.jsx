@@ -10,7 +10,15 @@ export const SectionLabel = ({ children }) => (
   <p className="inline-flex items-center gap-2 text-xs font-semibold text-amber-400
   tracking-[0.14em] uppercase mb-4">
 
-<span clasName="w-4 h-px bg-amber-400 rounded-full">{children}</span>
+  <span className="w-4 h-px bg-amber-400 rounded-full">{children}</span>
   </p>
 
 );
+
+export const SectionHeading = ({ gray, gold}) => (
+  <h2 className="font-serif text-[clamp(2rem,4vw,3rem)] leading-[1.1] tracking-[-0.025]em">
+    <GrayTitle>{gray}</GrayTitle>
+    <br />
+    <GoldTitle>{gold}</GoldTitle>
+  </h2>
+)

@@ -4,6 +4,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import { Toaster } from "@/components/ui/sonner";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -40,6 +42,8 @@ export default function RootLayout({ children }) {
             <Header />
             <main className="min-h-screen bg-background text-foreground">{children}</main>
             {/* Footer */}
+            <Footer />
+            <Toaster />
             </ThemeProvider>
         </body>
       </html>
