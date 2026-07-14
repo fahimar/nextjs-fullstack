@@ -7,6 +7,7 @@ import ReviewReport from "@/components/design-review/ReviewReport";
 import FindingCard from "@/components/design-review/FindingCard";
 import MermaidRenderer from "@/components/design-review/MermaidRenderer";
 import ProcessingView from "@/components/design-review/ProcessingView";
+import ReconstructionFeedback from "@/components/design-review/ReconstructionFeedback";
 import { getReviewForUser } from "@/lib/reviews";
 import { getReviewById, getOverallScore } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -159,6 +160,10 @@ export default async function DesignReviewReportPage({ params }) {
             The AI&apos;s reconstruction of your diagram — spot-check it to confirm it
             read your design correctly.
           </p>
+          <ReconstructionFeedback
+            reviewId={review.id}
+            initialValue={review.mermaidAccurate}
+          />
         </div>
 
         {/* Scores + summary + missing components */}

@@ -1,12 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { put } from "@vercel/blob";
 import { nanoid } from "nanoid";
 import { prisma } from "@/lib/db";
-import { reviewDesign } from "@/lib/ai/design-reviewer";
-import { serializeReview } from "@/lib/reviews";
+import { reviewDesign, quickSummary } from "@/lib/ai/design-reviewer";
 
 // Node runtime (default) — the Anthropic SDK and Prisma need Node, not edge.
+// `after()` keeps the function alive post-response (waitUntil on Vercel).
+// NOTE: on the Vercel hobby plan the post-response window is short (~10s+) —
+// if reviews get cut off there, swap the after() call for a QStash callback
+// that POSTs back to a /api/design-review/process endpoint.
+export const maxDuration = 120;
 
 const REVIEW_COST = 1;
 
@@ -81,6 +85,69 @@ async function uploadImage(imageBase64) {
     { access: "public", contentType: mediaType }
   );
   return blob.url;
+}
+
+// ── Background job (runs after the response is sent) ─────────
+async function processReview({ reviewId, userId, input }) {
+  const startedAt = Date.now();
+
+  // Fire the fast preview alongside the full review — the client polls it in
+  // while the structured JSON is still generating (streamed-UX, brain §7).
+  const previewPromise = quickSummary(input)
+    .then((summary) =>
+      prisma.designReview.update({
+        where: { id: reviewId },
+        data: { summaryPreview: summary },
+      })
+    )
+    .catch((err) =>
+      console.warn("design-review: summary preview failed", reviewId, err?.message)
+    );
+
+  try {
+    const { review: result, metrics } = await reviewDesign(input);
+
+    await prisma.designReview.update({
+      where: { id: reviewId },
+      data: { status: "COMPLETED", result },
+    });
+
+    await prisma.reviewMetric.create({
+      data: { reviewId, status: "COMPLETED", ...metrics },
+    });
+  } catch (err) {
+    console.error("design-review: AI review failed", reviewId, err?.message);
+
+    // Compensating transaction: refund the credit + mark the row FAILED.
+    try {
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { clerkId: userId },
+          data: { credits: { increment: REVIEW_COST } },
+        }),
+        prisma.designReview.update({
+          where: { id: reviewId },
+          data: { status: "FAILED" },
+        }),
+      ]);
+    } catch (refundErr) {
+      console.error("design-review: refund failed for", reviewId, refundErr);
+    }
+
+    await prisma.reviewMetric
+      .create({
+        data: {
+          reviewId,
+          status: "FAILED",
+          model: "claude-sonnet-4-6",
+          latencyMs: Date.now() - startedAt,
+          zodParseRetries: 0,
+        },
+      })
+      .catch(() => {});
+  } finally {
+    await previewPromise;
+  }
 }
 
 export async function POST(request) {
@@ -161,44 +228,8 @@ export async function POST(request) {
     );
   }
 
-  // ── Run the AI review (synchronous for now) ──
-  try {
-    const result = await reviewDesign(input);
+  // ── Async job: AI runs AFTER this response is sent; the client polls GET ──
+  after(() => processReview({ reviewId: review.id, userId, input }));
 
-    const updated = await prisma.designReview.update({
-      where: { id: review.id },
-      data: { status: "COMPLETED", result },
-    });
-
-    return NextResponse.json(
-      { id: updated.id, result: serializeReview(updated).result },
-      { status: 201 }
-    );
-  } catch (err) {
-    // Compensating transaction: refund the credit + mark the row FAILED.
-    try {
-      await prisma.$transaction([
-        prisma.user.update({
-          where: { clerkId: userId },
-          data: { credits: { increment: REVIEW_COST } },
-        }),
-        prisma.designReview.update({
-          where: { id: review.id },
-          data: { status: "FAILED" },
-        }),
-      ]);
-    } catch (refundErr) {
-      // Don't mask the original failure; flag for manual reconciliation.
-      console.error("design-review: refund failed for", review.id, refundErr);
-    }
-
-    const status = err?.status && err.status < 500 ? err.status : 502;
-    return NextResponse.json(
-      {
-        error: err?.message || "The AI review failed. Your credit was refunded.",
-        id: review.id,
-      },
-      { status }
-    );
-  }
+  return NextResponse.json({ id: review.id, status: "PROCESSING" }, { status: 202 });
 }

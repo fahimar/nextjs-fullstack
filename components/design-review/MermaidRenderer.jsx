@@ -6,6 +6,25 @@ import { cn } from "@/lib/utils";
 import { CopyIcon, CheckIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
+// AI-produced Mermaid is untrusted (prompt injection via the user's diagram can
+// flow through to extracted_mermaid). Strip everything that could execute or
+// weaken sandboxing BEFORE handing it to mermaid.render:
+//  - %%{...}%% directives (can override securityLevel/theme via init)
+//  - click/callback/href interaction statements (run JS / open links)
+//  - inline <script>, javascript: URLs, and on*= handlers
+// mermaid's securityLevel:"strict" is the second layer under this one.
+export function sanitizeMermaid(code) {
+  if (!code) return "";
+  return code
+    .replace(/%%\{[\s\S]*?\}%%/g, "") // init/config directives
+    .split("\n")
+    .filter((line) => !/^\s*(click|callback)\b/i.test(line))
+    .join("\n")
+    .replace(/<script\b[\s\S]*?(<\/script>|$)/gi, "")
+    .replace(/javascript\s*:/gi, "")
+    .replace(/\son\w+\s*=/gi, " ");
+}
+
 // Gold-accented dark theme so the reconstructed diagram matches our design language.
 const MERMAID_CONFIG = {
   startOnLoad: false,
@@ -94,7 +113,7 @@ function MermaidDiagram({ code }) {
         // Dynamic import — mermaid touches `document`, so it must stay client-only.
         const mermaid = (await import("mermaid")).default;
         mermaid.initialize(MERMAID_CONFIG);
-        const { svg: rendered } = await mermaid.render(renderId, code);
+        const { svg: rendered } = await mermaid.render(renderId, sanitizeMermaid(code));
         if (!cancelled) setSvg(rendered);
       } catch {
         if (!cancelled) setFailed(true);

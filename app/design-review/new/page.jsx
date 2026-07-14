@@ -60,8 +60,6 @@ const FOCUS_AREAS = [
 
 const REVIEW_COST = 1;
 
-const STAGES = ["Reading diagram…", "Analyzing scalability…", "Writing findings…"];
-
 export default function NewDesignReviewPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -79,7 +77,6 @@ export default function NewDesignReviewPage() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [stageIdx, setStageIdx] = useState(0);
 
   const hasDiagram =
     mode === "image" ? Boolean(imagePreview) : mermaid.trim().length > 0;
@@ -122,14 +119,6 @@ export default function NewDesignReviewPage() {
   const submit = async () => {
     setConfirmOpen(false);
     setSubmitting(true);
-    setStageIdx(0);
-
-    // Cycle the staged loading messages while the AI review runs.
-    let i = 0;
-    const timer = setInterval(() => {
-      i = Math.min(i + 1, STAGES.length - 1);
-      setStageIdx(i);
-    }, 1500);
 
     try {
       const res = await fetch("/api/design-review", {
@@ -162,80 +151,24 @@ export default function NewDesignReviewPage() {
           return;
         }
 
-        // AI failed after the row was created — credit refunded, FAILED row exists.
-        if (body.id) {
-          toast.error(body.error || "The review failed. Your credit was refunded.");
-          router.push(`/design-review/${body.id}`);
-          return;
-        }
-
-        throw new Error(body.error || "The review failed. Please try again.");
+        throw new Error(body.error || "Could not start the review. Please try again.");
       }
 
+      // 202 — the AI runs in the background; the report page polls it in.
       const data = await res.json();
-      toast.success("Review complete");
+      toast.success("Review started");
       router.push(`/design-review/${data.id}`);
     } catch (err) {
       // Request never produced a review row (signed out, bad input, network) —
       // stay on the wizard so nothing entered is lost.
       setSubmitting(false);
       toast.error(err.message || "Something went wrong");
-    } finally {
-      clearInterval(timer);
     }
   };
 
   return (
     <section className="relative min-h-screen pt-32 pb-20 px-5 sm:px-8 overflow-hidden">
       <StarsBackgroundDemo />
-
-      {/* Staged loading overlay while the AI review runs */}
-      {submitting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-6">
-          <div className="w-full max-w-sm text-center">
-            <span className="size-16 rounded-2xl bg-amber-400/10 border border-amber-400/20 mx-auto flex items-center justify-center mb-8">
-              <SparklesIcon className="size-7 text-amber-400 animate-pulse" />
-            </span>
-            <h2 className="font-serif text-2xl tracking-tight text-stone-100">
-              Reviewing your architecture
-            </h2>
-            <p className="text-stone-400 mt-2 text-sm">This usually takes under a minute.</p>
-
-            <div className="mt-8 space-y-3 text-left">
-              {STAGES.map((stage, i) => {
-                const state = i < stageIdx ? "done" : i === stageIdx ? "active" : "pending";
-                return (
-                  <div
-                    key={stage}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl border px-4 py-3 transition",
-                      state === "active"
-                        ? "border-amber-400/30 bg-amber-400/5"
-                        : "border-white/10 bg-[#0f0f11]"
-                    )}
-                  >
-                    {state === "done" ? (
-                      <span className="size-4 rounded-full bg-green-500/20 border border-green-500/40" />
-                    ) : state === "active" ? (
-                      <Loader2Icon className="size-4 text-amber-400 animate-spin" />
-                    ) : (
-                      <span className="size-4 rounded-full border border-white/15" />
-                    )}
-                    <span
-                      className={cn(
-                        "text-sm",
-                        state === "pending" ? "text-stone-600" : "text-stone-300"
-                      )}
-                    >
-                      {stage}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="relative max-w-2xl mx-auto">
         {/* Back to history */}
@@ -370,10 +303,18 @@ export default function NewDesignReviewPage() {
                 variant="gold"
                 size="hero"
                 onClick={openConfirm}
-                disabled={!enoughCredits}
+                disabled={!enoughCredits || submitting}
               >
-                <SparklesIcon className="size-4" />
-                {enoughCredits ? "Run review" : "Not enough credits"}
+                {submitting ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <SparklesIcon className="size-4" />
+                )}
+                {submitting
+                  ? "Starting…"
+                  : enoughCredits
+                    ? "Run review"
+                    : "Not enough credits"}
               </Button>
             </div>
           </div>
