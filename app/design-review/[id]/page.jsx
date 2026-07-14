@@ -1,40 +1,28 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { GoldTitle, GrayTitle } from "@/components/reusables";
 import ReviewReport from "@/components/design-review/ReviewReport";
 import FindingCard from "@/components/design-review/FindingCard";
 import MermaidRenderer from "@/components/design-review/MermaidRenderer";
-import {
-  getReviewById,
-  getOverallScore,
-  MOCK_REVIEWS,
-} from "@/lib/data";
+import ProcessingView from "@/components/design-review/ProcessingView";
+import { getReviewForUser } from "@/lib/reviews";
+import { getReviewById, getOverallScore } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
   GaugeIcon,
   CalendarIcon,
-  Loader2Icon,
-  SparklesIcon,
   MessageCircleQuestionIcon,
   TriangleAlertIcon,
   RotateCcwIcon,
   Share2Icon,
+  SearchXIcon,
 } from "lucide-react";
 
-const STAGES = [
-  "Reading your diagram…",
-  "Analyzing scalability…",
-  "Checking reliability & security…",
-  "Compiling findings…",
-];
-const STAGE_MS = 1200;
+const IS_DEV = process.env.NODE_ENV === "development";
 
 const formatDate = (iso) =>
   new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
@@ -49,120 +37,67 @@ const scoreColor = (score) => {
   return "text-red-400";
 };
 
-export default function DesignReviewReportPage() {
-  const { id } = useParams();
-  const router = useRouter();
+async function loadReview(id) {
+  const { userId } = await auth();
+  if (!userId) redirect("/sign-in");
 
-  const found = getReviewById(id);
-  const looksFailed = typeof id === "string" && id.toLowerCase().includes("fail");
-  const initialPhase = found
-    ? found.status.toLowerCase()
-    : looksFailed
-      ? "failed"
-      : "processing";
+  try {
+    const review = await getReviewForUser(id, userId);
+    if (review) return review;
+  } catch (err) {
+    // DB unreachable — in dev we can still serve the mock ids below.
+    if (!IS_DEV) throw err;
+    console.warn("design-review: DB unreachable, trying mock data", err?.message);
+  }
 
-  const [phase, setPhase] = useState(initialPhase); // processing | completed | failed
-  const [review, setReview] = useState(found ?? null);
-  const [stageIdx, setStageIdx] = useState(0);
+  // Dev-only fallback so the mock reports stay browsable without a DB.
+  if (IS_DEV) return getReviewById(id) ?? null;
+  return null;
+}
 
-  // Staged loading — advance messages, then resolve to a completed report.
-  // (Frontend mock: a freshly-submitted id has no persisted result, so we
-  // surface a representative report once "processing" finishes.)
-  useEffect(() => {
-    if (phase !== "processing") return;
+export default async function DesignReviewReportPage({ params }) {
+  const { id } = await params;
+  const review = await loadReview(id);
 
-    const timers = STAGES.map((_, i) =>
-      setTimeout(() => setStageIdx(i), i * STAGE_MS)
-    );
-    const done = setTimeout(() => {
-      setReview((prev) => (prev?.result ? prev : MOCK_REVIEWS[0]));
-      setPhase("completed");
-    }, STAGES.length * STAGE_MS);
-
-    return () => {
-      timers.forEach(clearTimeout);
-      clearTimeout(done);
-    };
-  }, [phase]);
-
-  // ── PROCESSING ────────────────────────────────────────────
-  if (phase === "processing") {
+  // ── NOT FOUND ─────────────────────────────────────────────
+  if (!review) {
     return (
-      <section className="min-h-screen pt-40 pb-24 px-5 sm:px-8 bg-black">
-        <div className="max-w-md mx-auto text-center">
-          <span className="size-16 rounded-2xl bg-amber-400/10 border border-amber-400/20 mx-auto flex items-center justify-center mb-8">
-            <SparklesIcon className="size-7 text-amber-400 animate-pulse" />
-          </span>
-          <h1 className="font-serif text-3xl tracking-tight">
-            <GrayTitle>Reviewing your</GrayTitle> <GoldTitle>architecture</GoldTitle>
-          </h1>
-          <p className="text-stone-400 mt-3 text-sm">
-            This usually takes under a minute.
-          </p>
-
-          <div className="mt-10 space-y-3 text-left">
-            {STAGES.map((stage, i) => {
-              const state =
-                i < stageIdx ? "done" : i === stageIdx ? "active" : "pending";
-              return (
-                <div
-                  key={stage}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl border px-4 py-3 transition",
-                    state === "active"
-                      ? "border-amber-400/30 bg-amber-400/5"
-                      : "border-white/10 bg-[#0f0f11]"
-                  )}
-                >
-                  {state === "done" ? (
-                    <span className="size-4 rounded-full bg-green-500/20 border border-green-500/40" />
-                  ) : state === "active" ? (
-                    <Loader2Icon className="size-4 text-amber-400 animate-spin" />
-                  ) : (
-                    <span className="size-4 rounded-full border border-white/15" />
-                  )}
-                  <span
-                    className={cn(
-                      "text-sm",
-                      state === "pending" ? "text-stone-600" : "text-stone-300"
-                    )}
-                  >
-                    {stage}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      <StatusShell
+        icon={<SearchXIcon className="size-7 text-stone-400" />}
+        iconClass="bg-white/5 border-white/10"
+        title="Review not found"
+        body="This review doesn't exist or belongs to another account."
+      >
+        <Link href="/design-review">
+          <Button variant="gold">Back to reviews</Button>
+        </Link>
+      </StatusShell>
     );
   }
 
+  // ── PROCESSING ────────────────────────────────────────────
+  if (review.status === "PROCESSING") {
+    return <ProcessingView id={id} />;
+  }
+
   // ── FAILED ────────────────────────────────────────────────
-  if (phase === "failed" || !review) {
+  if (review.status === "FAILED" || !review.result) {
     return (
-      <section className="min-h-screen pt-40 pb-24 px-5 sm:px-8 bg-black">
-        <div className="max-w-md mx-auto text-center">
-          <span className="size-16 rounded-2xl bg-red-500/10 border border-red-500/20 mx-auto flex items-center justify-center mb-8">
-            <TriangleAlertIcon className="size-7 text-red-400" />
-          </span>
-          <h1 className="font-serif text-3xl tracking-tight text-stone-100">
-            Review failed
-          </h1>
-          <p className="text-stone-400 mt-3 text-sm">
-            We couldn&apos;t analyze this diagram. Your credit has not been used —
-            please try again with a clearer image or Mermaid source.
-          </p>
-          <div className="flex justify-center gap-3 mt-8">
-            <Button variant="gold" onClick={() => router.push("/design-review/new")}>
-              <RotateCcwIcon className="size-4" /> Try again
-            </Button>
-            <Link href="/design-review">
-              <Button variant="outline">Back to reviews</Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <StatusShell
+        icon={<TriangleAlertIcon className="size-7 text-red-400" />}
+        iconClass="bg-red-500/10 border-red-500/20"
+        title="Review failed"
+        body="We couldn't analyze this diagram. Your credit was refunded — please try again with a clearer image or Mermaid source."
+      >
+        <Link href="/design-review/new">
+          <Button variant="gold">
+            <RotateCcwIcon className="size-4" /> Try again
+          </Button>
+        </Link>
+        <Link href="/design-review">
+          <Button variant="outline">Back to reviews</Button>
+        </Link>
+      </StatusShell>
     );
   }
 
@@ -284,3 +219,22 @@ export default function DesignReviewReportPage() {
     </section>
   );
 }
+
+// Shared centered shell for the not-found / failed states.
+const StatusShell = ({ icon, iconClass, title, body, children }) => (
+  <section className="min-h-screen pt-40 pb-24 px-5 sm:px-8 bg-black">
+    <div className="max-w-md mx-auto text-center">
+      <span
+        className={cn(
+          "size-16 rounded-2xl border mx-auto flex items-center justify-center mb-8",
+          iconClass
+        )}
+      >
+        {icon}
+      </span>
+      <h1 className="font-serif text-3xl tracking-tight text-stone-100">{title}</h1>
+      <p className="text-stone-400 mt-3 text-sm">{body}</p>
+      <div className="flex justify-center gap-3 mt-8">{children}</div>
+    </div>
+  </section>
+);
