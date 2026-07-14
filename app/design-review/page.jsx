@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
 import { Button } from "@/components/ui/button";
 import { GoldTitle, GrayTitle, SectionLabel } from "@/components/reusables";
 import { StarsBackgroundDemo } from "@/components/demo-components-backgrounds-stars";
+import { getUserReviews } from "@/lib/reviews";
 import {
   MOCK_REVIEWS,
   REVIEW_STATUS_STYLES,
@@ -17,6 +19,8 @@ import {
   GaugeIcon,
 } from "lucide-react";
 
+const IS_DEV = process.env.NODE_ENV === "development";
+
 const formatDate = (iso) =>
   new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
     month: "short",
@@ -30,8 +34,29 @@ const scoreColor = (score) => {
   return "text-red-400";
 };
 
-export default function DesignReviewPage() {
-  const reviews = MOCK_REVIEWS;
+async function loadReviews() {
+  const { userId } = await auth();
+
+  // Signed out: nothing to list (the hero still markets the feature).
+  // In dev, show the mocks so the page is browsable without auth + DB.
+  if (!userId) return IS_DEV ? MOCK_REVIEWS : [];
+
+  try {
+    const reviews = await getUserReviews(userId);
+    if (reviews.length === 0 && IS_DEV) return MOCK_REVIEWS;
+    return reviews;
+  } catch (err) {
+    // DB unreachable (e.g. paused Supabase project) — fall back to mocks in dev only.
+    if (IS_DEV) {
+      console.warn("design-review: DB unreachable, using mock data", err?.message);
+      return MOCK_REVIEWS;
+    }
+    throw err;
+  }
+}
+
+export default async function DesignReviewPage() {
+  const reviews = await loadReviews();
 
   return (
     <div className="bg-black">
@@ -76,15 +101,14 @@ export default function DesignReviewPage() {
           <h2 className="font-serif text-2xl tracking-tight text-stone-100">
             Your reviews
           </h2>
-          <span className="text-sm text-stone-500">
-            {reviews.length} total
-          </span>
+          <span className="text-sm text-stone-500">{reviews.length} total</span>
         </div>
 
         {reviews.length > 0 ? (
           <div className="space-y-4">
             {reviews.map((review) => {
-              const overall = getOverallScore(review);
+              const completed = review.status === "COMPLETED";
+              const overall = completed ? getOverallScore(review) : null;
               return (
                 <Link
                   key={review.id}
@@ -120,7 +144,7 @@ export default function DesignReviewPage() {
                         {formatDate(review.createdAt)}
                       </span>
                       <span className="text-stone-500">
-                        {review.result.findings.length} findings
+                        {review.result?.findings?.length ?? 0} findings
                       </span>
                     </div>
                   </div>
@@ -128,15 +152,21 @@ export default function DesignReviewPage() {
                   {/* Score */}
                   <div className="flex items-center gap-5 shrink-0">
                     <div className="text-right">
-                      <p
-                        className={cn(
-                          "font-serif text-2xl leading-none",
-                          scoreColor(overall)
-                        )}
-                      >
-                        {overall.toFixed(1)}
-                        <span className="text-sm text-stone-500"> / 10</span>
-                      </p>
+                      {completed ? (
+                        <p
+                          className={cn(
+                            "font-serif text-2xl leading-none",
+                            scoreColor(overall)
+                          )}
+                        >
+                          {overall.toFixed(1)}
+                          <span className="text-sm text-stone-500"> / 10</span>
+                        </p>
+                      ) : (
+                        <p className="font-serif text-2xl leading-none text-stone-600">
+                          —
+                        </p>
+                      )}
                       <p className="text-[10px] uppercase tracking-widest text-stone-600 mt-1">
                         Overall
                       </p>
